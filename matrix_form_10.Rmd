@@ -1,0 +1,309 @@
+---
+title: "Unveiling the Matrix: A Journey into Linear Regression with R (Part I)"
+output: html_notebook
+author: Tato Khundadze 
+---
+
+![](15.png)
+*Image generated using OpenAI's DALL-E.*
+
+
+## Introduction
+
+Welcome to the Matrix of Data, a realm where choices define reality, akin to the pivotal decision between the blue and red pills in 'The Matrix'. Opting for the blue pill is like running regression through a statistical program – a path of convenience and surface understanding. But today, we choose the red pill, delving into the intricacies of Ordinary Least Squares (OLS) regression in matrix form. This choice, embodied in our replication of the example from Annex C of the G&P textbook[^1] using R, takes us on a transformative journey. It reveals the inner mechanics of the statistical system, akin to understanding the underlying code of the Matrix. 
+
+## Dataset
+
+Our canvas for this statistical artistry is a dataset from the "Economic Report of the President, January 1972, Table B-16." Compact yet rich, this dataset is the perfect medium for our exploration, allowing us to maneuver through the nuances of matrix manipulations with ease. 
+
+**Variable Definitions:**
+- PER CAPITA PERSONAL CONSUMPTION EXPENDITURE (PPCE)
+- PER CAPITA PERSONAL DISPOSABLE INCOME (PPDI) in the United States, 1956–1970
+
+**Time Period Encoding:** 1 corresponds to the year 1956 (1 = 1956).
+
+
+
+### Data Import
+
+```{r}
+data=read.table("matrix.txt", header=T)
+data
+```
+
+
+We now can put this in the matrix equation format: 
+
+$$
+\left[\begin{array}{l}
+1673 \\
+1688 \\
+1666 \\
+1735 \\
+1749 \\
+1756 \\
+1815 \\
+1867 \\
+1948 \\
+2048 \\
+2128 \\
+2165 \\
+2257 \\
+2316 \\
+2324
+\end{array}\right]=\left[\begin{array}{llr}
+1 & 1839 & 1 \\
+1 & 1844 & 2 \\
+1 & 1831 & 3 \\
+1 & 1881 & 4 \\
+1 & 1883 & 5 \\
+1 & 1910 & 6 \\
+1 & 1969 & 7 \\
+1 & 2016 & 8 \\
+1 & 2126 & 9 \\
+1 & 2239 & 10 \\
+1 & 2336 & 11 \\
+1 & 2404 & 12 \\
+1 & 2487 & 13 \\
+1 & 2535 & 14 \\
+1 & 2595 & 15
+\end{array}\right] \quad\left[\begin{array}{l}
+\hat{\beta}_1 \\
+\hat{\beta}_2 \\
+\hat{\beta}_3
+\end{array}\right]+\left[\begin{array}{l}
+\hat{u}_1 \\
+\hat{u}_2 \\
+\hat{u}_3 \\
+\hat{u}_4 \\
+\hat{u}_5 \\
+\hat{u}_6 \\
+\hat{u}_7 \\
+\hat{u}_8 \\
+\hat{u}_9 \\
+\hat{u}_{10} \\
+\hat{u}_{11} \\
+\hat{u}_{12} \\
+\hat{u}_{13} \\
+\hat{u}_{14} \\
+\hat{u}_{15}
+\end{array}\right]
+$$
+
+
+As noted in slides (10) we can obtain coefficient estimates with this formula:
+
+$$
+\hat{\beta}=\left(\mathbf{X}^{\prime} \mathbf{X}\right)^{-1} \mathbf{X}^{\prime} \mathbf{y}
+$$
+The formula includes two components: A) **Gram Matrix**  or Normal Matrix: $\left.\mathbf{X}^{\prime} \mathbf{X}\right)$; and B) **Moment Matrix**: $\mathbf{X}^{\prime} \mathbf{y}$.  $\mathbf{X}$ itself called **Design Matrix** or just data matrix.  Gram Matrix should be invertible, otherwise, we will not be able to calculate coefficient estimates, as mentioned in slides (10). We can calculate each component of the estimator by step by step. 
+
+- Step 1: Create Design Matrix 
+
+```{r}
+# Create Design X matrix and Y 
+
+ones_column <- matrix(1, nrow = nrow(data), ncol = 1)
+X= as.matrix(data[,-1])
+y= as.matrix(data[,1])
+
+X <- cbind(ones_column, X)
+colnames(X) <- NULL
+
+X = as.matrix(X)
+X
+y
+```
+
+- Step 2: Create Gram Matrix
+
+
+```{r}
+gram_matrix=t(X)%*%X
+gram_matrix
+```
+
+- Step 3: Create Moment Matrix
+
+```{r}
+moment_matirx = t(X)%*%y
+
+moment_matirx
+```
+
+- Step 3: Calculate Betas 
+
+```{r}
+beta_vector = solve(gram_matrix)%*%moment_matirx
+
+beta_vector
+
+```
+
+We got the following results: 
+
+
+$$
+\hat{\boldsymbol{\beta}}=\left(\mathbf{X}^{\prime} \mathbf{X}\right)^{-1} \mathbf{X}^{\prime} \mathbf{y}=\left[\begin{array}{r}
+300.28625 \\
+0.74198 \\
+8.04356
+\end{array}\right]
+$$
+We can compare these results with those obtained using the `lm()` function.
+
+```{r}
+model1 = lm(PPCE_Y ~PPDI_X2+Time_X3, data=data)
+summary(model1)
+```
+We can proceed to obtain additional statistics provided in the lm() output. As the next step, we will calculate the **variance-covariance matrix** using the following formula:
+
+$$
+\operatorname{var}-\operatorname{cov}(\hat{\boldsymbol{\beta}})=\hat{\sigma}^2\left(\mathbf{X}^{\prime} \mathbf{X}\right)^{-1}
+$$
+We already have gram matrix, but we need to calculate $\hat{\sigma}^2$, which is unbiased estimator of homoscedastic variance $u_i$. We can use the following formula for calculating $\hat{\sigma}^2$: 
+
+$$
+\begin{aligned}
+\hat{\sigma}^2 & =\frac{\sum \hat{u}_i^2}{n-k} \\
+& =\frac{\hat{\mathbf{u}}^{\prime} \hat{\mathbf{u}}}{n-k}
+\end{aligned}
+$$
+
+But for this formula, we need $u$ (residuals), more specifically residual sum of squares ($\hat{\mathbf{u}}^{\prime} \hat{\mathbf{u}}$). We can use following formula for calculating RSS: 
+
+$$
+\begin{aligned} \sum \hat{u}_i^2 & =\hat{\mathbf{u}}^{\prime} \hat{\mathbf{u}} \\ & =\mathbf{y}^{\prime} \mathbf{y}-\hat{\beta}^{\prime} \mathbf{X}^{\prime} \mathbf{y}\end{aligned}
+$$
+```{r}
+rss = t(y)%*%y - t(beta_vector)%*%t(X)%*%y
+rss
+```
+
+Hence, we can obtain $\hat{\sigma}^2$ (we are dividing rss by degrees of freedom which is 12 in this case: n-k, where n is number of observations and k number of parameters): 
+
+```{r}
+sigma_hat_squared= as.numeric(rss/12)
+sigma_hat_squared
+```
+
+Finally, we can calculate variance-covariance matrix in the following way:
+
+```{r}
+var_cov_beta = sigma_hat_squared * solve(gram_matrix)
+var_cov_beta
+```
+As we mentioned during discussing slides, diagonal elements of the variance-covariance matrix represents variances of coefficient estimates. If we take square roots of the absolute values of the diagonal elements, we will get respective standard errors for each estimate: 
+
+```{r}
+
+standard_errors <- sqrt(abs(diag(var_cov_beta)))
+standard_errors
+
+```
+
+We can continue the process of calculating other components of the regression output and calculate $R^2$. In matrix form, the formula looks in the following way: 
+
+$$
+R^2=\frac{\hat{\boldsymbol{\beta}}^{\prime} \mathbf{X}^{\prime} \mathbf{y}-n \bar{Y}^2}{\mathbf{y}^{\prime} \mathbf{y}-n \bar{Y}^2}
+$$
+To remind you, in the numerator in above formula, we have ESS (explained sum of squares) and denominator is TSS (total sum of squares)
+
+```{r}
+n=15
+ESS = (t(beta_vector) %*% t(X) %*% y - n * (mean(y))^2)
+TSS = (t(y) %*% y - n * (mean(y))^2)
+
+r_squared = ESS/TSS
+
+
+r_squared
+```
+
+The F-test value can be calculated with this formula: 
+$$
+F=\frac{\left(\hat{\boldsymbol{\beta}}^{\prime} \mathbf{X}^{\prime} \mathbf{y}-n \bar{Y}^2\right) /(k-1)}{\left(\mathbf{y}^{\prime} \mathbf{y}-\hat{\boldsymbol{\beta}}^{\prime} \mathbf{X}^{\prime} \mathbf{y}\right) /(n-k)}
+$$
+
+
+Which is simply the following: 
+
+$$
+F=\frac{\operatorname{ESS} /(k-1)}{\operatorname{RSS} /(n-k)}
+$$
+
+```{r}
+k=3  # degrees of freedom 
+
+F = (ESS/(k-1))/(rss/(n-k))
+F 
+
+
+```
+
+![](17.png)
+*Image generated using OpenAI's DALL-E.*
+
+## Epilogue: The Beginning of Our Matrix
+
+As Morpheus revealed a deeper reality to Neo, so has our journey through linear regression in R unveiled the intricate matrix of data. Our venture, far from concluding, is merely the beginning. Like stepping through the looking glass, we have only begun to scratch the surface of a vast universe where numbers and patterns intertwine in a complex, yet harmonious dance. This exploration is not an end, but an invitation to a larger world of understanding — a world where, with each dataset and every line of R code, we continually awaken to the endless possibilities hidden within the data matrix.
+
+## References
+
+[^1]: Gujarati, D. N., & Porter, D. C. (2008). *Basic Econometrics* (5th ed.). McGraw-Hill Education.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
